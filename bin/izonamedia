@@ -1,0 +1,58 @@
+#!/bin/bash
+
+#
+# Izonamedia - ISO on a Media
+#
+# A command line tool to easily burn ISO image on an external media.
+# Usually on USB stick.
+#
+
+
+if [ -z "$1" ] || [ -z "$2" ]; then
+    echo "Usage: izonamedia <image>.iso <disk>"
+    echo "Example: izonamedia ubuntu.iso /dev/sdc"
+elif [ -f "$1" ]; then
+    if [[ "$1" != *".iso" ]]; then
+        echo izonamedia: "$1: not ISO image file"
+        exit
+    fi
+
+    WAS_MOUNTED=false
+    for filesystem in `df -aTh | grep /media/ | cut -d ' ' -f 1`; do
+        if [ `echo "$filesystem" | cut -b -8` = "$2" ]; then
+            WAS_MOUNTED=true
+
+            sudo umount $filesystem
+            
+            if [ `echo $?` = 0 ]; then
+                echo izonamedia: "$filesystem: disk unmounted"
+            else
+                echo izonamedia: "No permission granted"
+                exit
+            fi
+        fi
+    done
+
+    if [ "$WAS_MOUNTED" = "true" ]; then
+
+        sudo mkfs.vfat -F 32 -I $2
+
+        if [ `echo $?` = 0 ]; then
+            echo izonamedia: "$2: disk formated to FAT32"
+
+            sudo dd if=$1 of=$2 bs=4M conv=fdatasync status=progress
+
+            if [ `echo $?` = 0 ]; then
+                echo izonamedia: "successfully complete"
+            else
+                echo izonamedia: "'dd' command failed somehow :("
+            fi
+        else
+            echo izonamedia: "$2: disk format failed"
+        fi
+    else
+        echo izonamedia: "$2: should be an external mounted media"
+    fi
+else
+    echo izonamedia: "$1: no such file"
+fi
